@@ -1055,14 +1055,12 @@ components:
                 - completed
             data:
               type: object
-              properties:
               description: Output response from  current state of the job.
             dataURL:
               type: string
               description: The data returned from execution of capability. If the data is more than 250 kB and less the 20 MB, it will be provided as a presigned URL. If it is more than 20 MB, the job will fail.
             outputs:
               type: object
-              properties:
               description: This contains list of URL for all the generated assets 
                   
     failedEvent:
