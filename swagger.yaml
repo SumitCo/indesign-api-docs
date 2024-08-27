@@ -1,9 +1,8 @@
 openapi: 3.0.0
 info:
-  description: Documentation for InDesign Cloud Services. This document provides a
-    detailed specification of the various exposed APIs, that can be leveraged by developers. 
+  description: Documentation for InDesign APIs (Beta) - Firefly Services. This document provides a detailed specification of the various exposed APIs, that can be leveraged by developers. 
   version: 0.1.0
-  title: InDesign Services.
+  title: InDesign APIs (Beta) - Firefly Services
   contact:
     email: idservices@adobe.com
 tags:
@@ -16,13 +15,13 @@ security:
   - BearerAuth: [] 
 paths:
 
-  /api/v3/create-rendition:
+  /v3/create-rendition:
     post:
       tags:
         - rendition
       summary: Creates JPEG,PNG or PDF renditions.
       description: Creates and returns JPEG,PNG or PDF renditions of a specific InDesign document.
-        Output rendition has mimetype 'image/jpeg' for jpeg, 'image/png' for png and 'application/pdf' for pdf. For the structure of StatusCompletedResponse/output/data refer to RenditionOutputData. Also for the list of possible error codes in FailedEvent refer to RenditionFailedData.
+        Output rendition has mimetype 'image/jpeg' for jpeg, 'image/png' for png and 'application/pdf' for pdf. For the structure of output/data refer to RenditionOutputData. Also for the list of possible error codes in failedEvent refer to RenditionFailedData.
       operationId: renditionJob
       requestBody:
         content:
@@ -46,7 +45,7 @@ paths:
         500:
           $ref: "#/components/responses/InternalServerError"
       
-  /api/v3/merge-data:
+  /v3/merge-data:
     post:
       tags:
         - dataMerge
@@ -75,7 +74,7 @@ paths:
         500:
           $ref: "#/components/responses/InternalServerError"
 
-  /api/v3/merge-data-tag:
+  /v3/merge-data-tags:
     post:
       tags:
         - dataMerge
@@ -103,7 +102,7 @@ paths:
         500:
           $ref: "#/components/responses/InternalServerError"
 
-  /api/v3/status/{id}:
+  /v3/status/{id}:
     get:
       summary: Gets latest status for a job.
       description: Returns the latest status event of a capability execution.
@@ -124,10 +123,15 @@ paths:
                 oneOf:
                   - $ref: '#/components/schemas/notstartedEvent'
                   - $ref: '#/components/schemas/runningEvent'
-                  - $ref: '#/components/schemas/completedEvent'
+                  - $ref: '#/components/schemas/succeededEvent'
                   - $ref: '#/components/schemas/failedEvent'
+          headers:
+            retry-after:
+              schema:
+                type: integer
+              description: Number of retries  
 
-  /api/v3/capability:
+  /v3/capability:
     post:
       summary: Submit custom capability.
       description: Submit the capability bundle. Returns the URL for posting execution request against the capability
@@ -172,7 +176,7 @@ paths:
         500:
           $ref: "#/components/responses/InternalServerError"
 
-  /api/v3/capability/{product}/{organization}/{capability}:
+  /v3/capability/{product}/{organization}/{capability}:
     post:
       summary: Submit capability execution request.
       description: Define the input assets and parameters with which the capability should be executed against the app engine.
@@ -223,7 +227,7 @@ paths:
           $ref: "#/components/responses/InternalServerError"
 
 servers:
-  - url: https://indesign-dev.adobe.io/
+  - url: https://indesign-stage.adobe.io/
 components:
   securitySchemes:
     ApiKeyAuth:
@@ -241,12 +245,22 @@ components:
         application/json:
           schema:
             properties:
-              id:
+              jobId:
                 type: string
                 description: ID
-              status_url:
+              statusUrl:
                 type: string
                 description: Status URL
+      headers:
+        link:
+          schema:
+            type: string
+          description: status url for retry
+        retry-after:
+          schema:
+            type: integer
+          description: Number of retries  
+        
     BadParams:
       description: Bad Parameter
       content:
@@ -283,8 +297,11 @@ components:
       properties:
         message:
           type: string
+        error_code:
+          type: string
       required:
         - message
+        - error_code
 
     BaseJobRequest:
       description: Base job request for any job.
@@ -503,9 +520,9 @@ components:
                   type: integer
                   description: The error code.
                   enum:
-                    - 'internal_error'
+                    - 'runtime_error'
                     - 'capability_error'
-                    - 'parameter_error'
+                    - 'validation_error'
 
     CreateRenditionRequest:
       allOf:
@@ -519,7 +536,7 @@ components:
               type: object
               required:
               - targetDocuments
-              - outputType
+              - outputMediaType
               properties:
                 targetDocuments:
                   description: List of documents to render as per the given parameters. Currently, only one document is supported.
@@ -528,7 +545,7 @@ components:
                     type: string
                   minItems: 1
                   maxItems: 1
-                outputType:
+                outputMediaType:
                   description: The type output rendition to be created.
                   type: string
                   enum:
@@ -692,7 +709,7 @@ components:
                 dataSource:
                   description: The data source files to be used.
                   type: string
-                outputType:
+                outputMediaType:
                   description: The type of required output.
                   type: string
                   enum:
@@ -707,10 +724,10 @@ components:
                   properties:
                     jobOptionsFile:
                       type: string
-                      description: Only relevant if outputType is "PDF". The file, which will be used as PDF creation settings file during the export. This will take precedence over pdfPreset attribute.
+                      description: Only relevant if outputMediaType is "application/pdf". The file, which will be used as PDF creation settings file during the export. This will take precedence over pdfPreset attribute.
                     pdfPreset:
                       type: string
-                      description: The PDF export style to be used. This is relevant if outputType is "PDF".
+                      description: The PDF export style to be used. This is relevant if outputMediaType is "application/pdf".
                       default: High Quality Print
                       enum:
                         - High Quality Print
@@ -729,7 +746,7 @@ components:
                         - high
                         - maximum
                     linkImages:
-                      description: Only relevant if outputType is "INDD". If true, links images to the target document. If false, embeds linked images, already referred in the target document.
+                      description: Only relevant if outputMediaType is "application/x-indesign". If true, links images to the target document. If false, embeds linked images, already referred in the target document.
                       type: boolean
                       default: false
                 recordRange:
@@ -773,7 +790,7 @@ components:
                   description: These are the options for image placement which will be used while merging images in the document.
                   type: object
                   properties:
-                    centreImage:
+                    centerImage:
                       description: If true, centers the image in the frame while preserving the frame size as content size and proportions. If the content is larger than the frame, content around the edges is obscured by the bounding box of the frame. This doesn't work with 'Content_Aware_Fit' fittingOption.
                       type: boolean
                     fittingOption:
@@ -783,7 +800,7 @@ components:
                         * `fill_proportional` - Resizes content to fill the frame while preserving the proportions of the content. If the content and frame have different proportions, some of the content is obscured by the bounding box of the frame.
                         * `fit_content_to_frame` - Resizes content to fit the frame. Note: Content that is a different size than the frame appears stretched or squeezed.
                         * `fit_frame_to_content` - Resizes the frame so it fits the content.
-                        * `honour_existing_style` - Apply the frame fitting based on existing setting applied on the original frame.
+                        * `honor_existing_style` - Apply the frame fitting based on existing setting applied on the original frame.
                         * `preserve_sizes` - Preserves the original sizes of the frame and the content. Note: Content that is larger than the frame is obscured around the edges.
                         * `proportional` - Resizes content to fit the frame while preserving content proportions. If the content and frame have different proportions, an empty space occurs in the frame.
                       type: string
@@ -792,7 +809,7 @@ components:
                         - fill_proportional
                         - fit_content_to_frame
                         - fit_frame_to_content
-                        - honour_existing_style
+                        - honor_existing_style
                         - preserve_sizes
                         - proportional
                     linkImages:
@@ -830,7 +847,7 @@ components:
                 properties:
                   recordIndex:
                     type: string
-                    description: Indicates the record numbers for which the data is provided here.
+                    description: Indicates the record numbers for which the data is provided here.`
                   outputs:
                     description: The list of outputs corresponding to this record.
                     type: array
@@ -865,9 +882,9 @@ components:
                   type: integer
                   description: The error code.
                   enum:
-                    - 'internal_error'
+                    - 'runtime_error'
                     - 'capability_error'
-                    - 'parameter_error'
+                    - 'validation_error'
 
     MergeDataTagsRequest:
       allOf:
@@ -889,9 +906,10 @@ components:
                   description: The data source file to be used for extracting and matching the tags.
                   type: string
                 filter:
-                  type: string
-                  default: All
-                  description: Accepted values are "All", "Text", "Image" and "QR". Multiple values can be provided. For example, "Text, Image"
+                  description: Accepted values are "all", "text", "image" and "qr". Multiple values can be provided. Default value is "all". Example, ["Text, Image"]
+                  type: array
+                  items:
+                    type: string
                 includePageItemIdentifiers:
                   type: boolean
                   description: If true, the information for associated page items is added to the tags extracted from the document.
@@ -1000,9 +1018,9 @@ components:
                   type: integer
                   description: The error code.
                   enum:
-                    - 'internal_error'
+                    - 'runtime_error'
                     - 'capability_error'
-                    - 'parameter_error'
+                    - 'validation_error'
     
     BaseEvent:
       type: object
@@ -1015,19 +1033,19 @@ components:
     notstartedEvent:
       allOf:
         - $ref: '#/components/schemas/BaseEvent'
-        - description: Queued Event
+        - description: Job is in queued state.
           type: object
           properties:
             status:
               type: string
               description: The current state of the job.
               enum:
-                - not-started
+                - not_started
 
     runningEvent:
       allOf:
         - $ref: '#/components/schemas/BaseEvent'
-        - description: Running Event
+        - description: Job is in running state.
           type: object
           properties:
             status:
@@ -1035,17 +1053,14 @@ components:
               description: The current state of the job.
               enum:
                 - running
-            percentCompleted :
-              type: integer
-              description: Job completed percentage.
             message :
               type: string
               description: Description of current running state.
 
-    completedEvent:
+    succeededEvent:
       allOf:
         - $ref: '#/components/schemas/BaseEvent'
-        - description: Running Event
+        - description: Job is completed.
           type: object
           properties:
             status:
@@ -1055,18 +1070,20 @@ components:
                 - completed
             data:
               type: object
+              properties:
               description: Output response from  current state of the job.
             dataURL:
               type: string
               description: The data returned from execution of capability. If the data is more than 250 kB and less the 20 MB, it will be provided as a presigned URL. If it is more than 20 MB, the job will fail.
             outputs:
               type: object
+              properties:
               description: This contains list of URL for all the generated assets 
                   
     failedEvent:
       allOf:
         - $ref: '#/components/schemas/BaseEvent'
-        - description: Running Event
+        - description: Job is in failed state.
           type: object
           properties:
             status:
@@ -1087,17 +1104,19 @@ components:
         - type: object
           description: Error codes from capabilities and their definitions.
           properties:
-            internal_error:
+            runtime_error:
               type: string
               description : |
-                - Internal error: Unable to connect to server for communication.
-                - Internal error: Error parsing the response from application.
-                - Internal script error. This should not had happened.
-                - Internal error: Error during processing.
-                - Internal error: Unable to create specified output directory.
-                - PreJob internal script error. This should not had happened.
-                - PreJob internal error: Error during processing.
-                - PreJob internal error: Unable to create specified output directory.
+                - Runtime error: Unable to connect to server for communication.
+                - Runtime error: Error parsing the response from application.
+                - Runtime script error. This should not had happened.
+                - Runtime error: Error during processing.
+                - Runtime error: Unable to create specified output directory.
+                - PreJob runtime script error. This should not had happened.
+                - PreJob runtime error: Error during processing.
+                - PreJob runtime error: Unable to create specified output directory.
+                - Application error: Script execution failed.
+                - Error during processing.
             capability_error:
               type: string
               description: |
@@ -1105,44 +1124,89 @@ components:
                 - Capability error: Unable to relink. Relink failed for 'parameterName'.
                 - Capability error: Unable to place. Place failed for 'parameterName'.
                 - Capability error: Cannot open file.
-            parameter_error:
+            validation_error:
               type: string
               description: |
-                - Parameter error: Expected array for property 'parameterName'.
-                - Parameter error: Expected boolean 'parameterName' is the provided value for property 'parameterName'.
-                - Parameter error: Expected integer 'parameterName' is the provided value for property 'parameterName'.
-                - Parameter error: Expected number 'parameterName' is the provided value for property 'parameterName'.
-                - Parameter error: Expected string 'parameterName' is the provided value for property 'parameterName'.
-                - Parameter error: Incorrect range provided. Culprit Value is 'parameterName'.
-                - Parameter error: Key not found in object. Missing key is 'parameterName'.
-                - Parameter error: No matching enum value found. 'parameterName' is the provided value for property 'parameterName'.
-                - Parameter error: Empty filter provided for extraction of tags.
-                - Parameter error: Empty data source found.
-                - Parameter error: Relative path not acceptable. Path provided is 'parameterName'
-                - Parameter error: Mismatch in jobType. Provided value is 'parameterName'
-                - Parameter error: Either the params is not found in the request or it is not in the correct format.
-                - Parameter error: Required parameters are missing. Please check 'parameterName'
-                - Parameter error: The link URI was not found. Provided link URI is 'parameterName'.
-                - Parameter error: Expected object for property 'parameterName'.
-                - Parameter error: At least one of the parameters should be present. Missing parameters are 'parameterName'
-                - Parameter error: Unable to send the script to the server. Please check the path of the script.
-                - Parameter error: The link id was not found. Provided link id is 'parameterName'.
-                - Parameter error: Unable to send the script to the server. Please check the path of the script.
-                - Parameter error: Relative path not acceptable. 'parameterName' is the provided value for property 'parameterName'.
-                - PreJob parameter error: Expected array for property 'parameterName'.
-                - PreJob parameter error: Expected boolean 'parameterName' is the provided value for property 'parameterName'.
-                - PreJob parameter error: Expected integer 'parameterName' is the provided value for property 'parameterName'.
-                - PreJob parameter error: Expected number 'parameterName' is the provided value for property 'parameterName'.
-                - PreJob parameter error: Expected string 'parameterName' is the provided value for property 'parameterName'.
-                - PreJob parameter error: Incorrect range provided. Culprit Value is 'parameterName'.
-                - PreJob parameter error: Key not found in object. Missing key is 'parameterName'.
-                - PreJob parameter error: No matching enum value found. 'parameterName' is the provided value for property 'parameterName'.
-                - PreJob parameter error: Relative path not acceptable. Path provided is 'parameterName'  
+                - Validation error: Expected array for property 'parameterName'.
+                - Validation error: Expected boolean 'parameterName' is the provided value for property 'parameterName'.
+                - Validation error: Expected integer 'parameterName' is the provided value for property 'parameterName'.
+                - Validation error: Expected number 'parameterName' is the provided value for property 'parameterName'.
+                - Validation error: Expected string 'parameterName' is the provided value for property 'parameterName'.
+                - Validation error: Incorrect range provided. Culprit Value is 'parameterName'.
+                - Validation error: Key not found in object. Missing key is 'parameterName'.
+                - Validation error: No matching enum value found. 'parameterName' is the provided value for property 'parameterName'.
+                - Validation error: Empty filter provided for extraction of tags.
+                - Validation error: Empty data source found.
+                - Validation error: Relative path not acceptable. Path provided is 'parameterName'
+                - Validation error: Mismatch in jobType. Provided value is 'parameterName'
+                - Validation error: Either the params is not found in the request or it is not in the correct format.
+                - Validation error: Required parameters are missing. Please check 'parameterName'
+                - Validation error: The link URI was not found. Provided link URI is 'parameterName'.
+                - Validation error: Expected object for property 'parameterName'.
+                - Validation error: At least one of the parameters should be present. Missing parameters are 'parameterName'
+                - Validation error: Unable to send the script to the server. Please check the path of the script.
+                - Validation error: The link id was not found. Provided link id is 'parameterName'.
+                - Validation error: Unable to send the script to the server. Please check the path of the script.
+                - Validation error: Relative path not acceptable. 'parameterName' is the provided value for property 'parameterName'.
+                - PreJob validation error: Expected array for property 'parameterName'.
+                - PreJob validation error: Expected boolean 'parameterName' is the provided value for property 'parameterName'.
+                - PreJob validation error: Expected integer 'parameterName' is the provided value for property 'parameterName'.
+                - PreJob validation error: Expected number 'parameterName' is the provided value for property 'parameterName'.
+                - PreJob validation error: Expected string 'parameterName' is the provided value for property 'parameterName'.
+                - PreJob validation error: Incorrect range provided. Culprit Value is 'parameterName'.
+                - PreJob validation error: Key not found in object. Missing key is 'parameterName'.
+                - PreJob validation error: No matching enum value found. 'parameterName' is the provided value for property 'parameterName'.
+                - PreJob validation error: Relative path not acceptable. Path provided is 'parameterName'  
             application_error:
               type: string
               description : |
                 - Application error: Script execution failed.
                 - Error during processing.
+            resource_not_found:
+              type: string
+              description : |
+                - Error in resolving asset
+                - Job id not found
+            invalid_parameters:
+              type: string
+              description : |
+                - invalid capability bundle
+                - invalid extension
+                - invalid storage type
+                - invalid request parameters
+            access_error:
+              type: string
+              description : |
+                - api-key not allowed
+                - capability not found
+                - user does not have access to the resource
+                - private capability
+            unauthorised_error:
+              type: string
+              description : |
+                - Application error: Script execution failed.
+                - Error during processing.
+            unsupported_method:
+              type: string
+              description : |
+                - HTTP method used in the request is not allowed for the requested resource
+            request_not_acceptable:
+              type: string
+              description : |
+                - the server cannot produce a response that matches any of the acceptable media types specified in the Accept header.
+            invalid_content_type:
+              type: string
+              description : |
+                - Payload is in unsupported format
+            service_unavailable:
+              type: string
+              description : |
+                - Error while getting organization for user
+            timeout_error:
+              type: string
+              description : |
+                - Job execution exceeded timeout
+                - Job timeout occurred
 
     StatusResponse:
       type: object
@@ -1154,7 +1218,7 @@ components:
             oneOf:
               - $ref: '#/components/schemas/notstartedEvent'
               - $ref: '#/components/schemas/runningEvent'
-              - $ref: '#/components/schemas/completedEvent'
+              - $ref: '#/components/schemas/succeededEvent'
               - $ref: '#/components/schemas/failedEvent'
 
     InputAsset:
@@ -1173,10 +1237,9 @@ components:
               description: URL of the asset.
             storageType:
               type: string
-              description: This is optional parameter. However, if Azure storage is used. It is recommended to provide this information.
+              description: This is optional parameter. It is recommended to provide this information.
               enum:
                 - Azure
-                - Aws
                 - Dropbox
             
         destination:
@@ -1201,10 +1264,9 @@ components:
               description: URL of the asset.
             storageType:
               type: string
-              description: This is optional parameter. However, if Azure storage is used. It is recommended to provide this information.
+              description: This is optional parameter. It is recommended to provide this information.
               enum:
                 - Azure
-                - Aws
                 - Dropbox
         source:
           type: string
